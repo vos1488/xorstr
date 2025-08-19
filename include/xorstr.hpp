@@ -129,6 +129,12 @@ namespace jm {
 
         XORSTR_FORCEINLINE void crypt() noexcept
         {
+            perform_crypt_operation();
+        }
+
+    private:
+        XORSTR_FORCEINLINE void perform_crypt_operation() noexcept
+        {
             // everything is inlined by hand because a certain compiler with a certain linker is _very_ slow
 #if defined(__clang__)
             alignas(alignment)
@@ -172,6 +178,8 @@ namespace jm {
 #endif
         }
 
+    public:
+
         XORSTR_FORCEINLINE const_pointer get() const noexcept
         {
             return reinterpret_cast<const_pointer>(_storage);
@@ -184,49 +192,8 @@ namespace jm {
 
         XORSTR_FORCEINLINE pointer crypt_get() noexcept
         {
-            // crypt() is inlined by hand because a certain compiler with a certain linker is _very_ slow
-#if defined(__clang__)
-            alignas(alignment)
-                std::uint64_t arr[]{ ::jm::detail::load_from_reg(Keys)... };
-            std::uint64_t*    keys =
-                (std::uint64_t*)::jm::detail::load_from_reg((std::uint64_t)arr);
-#else
-            alignas(alignment) std::uint64_t keys[]{ ::jm::detail::load_from_reg(Keys)... };
-#endif
-
-#if defined(_M_ARM64) || defined(__aarch64__) || defined(_M_ARM) || defined(__arm__)
-#if defined(__clang__)
-            ((Indices >= sizeof(_storage) / 16 ? static_cast<void>(0) : __builtin_neon_vst1q_v(
-                                    reinterpret_cast<uint64_t*>(_storage) + Indices * 2,
-                                    veorq_u64(__builtin_neon_vld1q_v(reinterpret_cast<const uint64_t*>(_storage) + Indices * 2, 51),
-                                              __builtin_neon_vld1q_v(reinterpret_cast<const uint64_t*>(keys) + Indices * 2, 51)),
-                                    51)), ...);
-#else // GCC, MSVC
-            ((Indices >= sizeof(_storage) / 16 ? static_cast<void>(0) : vst1q_u64(
-                        reinterpret_cast<uint64_t*>(_storage) + Indices * 2,
-                        veorq_u64(vld1q_u64(reinterpret_cast<const uint64_t*>(_storage) + Indices * 2),
-                                  vld1q_u64(reinterpret_cast<const uint64_t*>(keys) + Indices * 2)))), ...);
-#endif
-#elif !defined(JM_XORSTR_DISABLE_AVX_INTRINSICS)
-            ((Indices >= sizeof(_storage) / 32 ? static_cast<void>(0) : _mm256_store_si256(
-                reinterpret_cast<__m256i*>(_storage) + Indices,
-                _mm256_xor_si256(
-                    _mm256_load_si256(reinterpret_cast<const __m256i*>(_storage) + Indices),
-                    _mm256_load_si256(reinterpret_cast<const __m256i*>(keys) + Indices)))), ...);
-
-            if constexpr(sizeof(_storage) % 32 != 0)
-                _mm_store_si128(
-                    reinterpret_cast<__m128i*>(_storage + sizeof...(Keys) - 2),
-                    _mm_xor_si128(_mm_load_si128(reinterpret_cast<const __m128i*>(_storage + sizeof...(Keys) - 2)),
-                                  _mm_load_si128(reinterpret_cast<const __m128i*>(keys + sizeof...(Keys) - 2))));
-#else
-        ((Indices >= sizeof(_storage) / 16 ? static_cast<void>(0) : _mm_store_si128(
-            reinterpret_cast<__m128i*>(_storage) + Indices,
-            _mm_xor_si128(_mm_load_si128(reinterpret_cast<const __m128i*>(_storage) + Indices),
-                          _mm_load_si128(reinterpret_cast<const __m128i*>(keys) + Indices)))), ...);
-#endif
-
-            return (pointer)(_storage);
+            perform_crypt_operation();
+            return get();
         }
     };
 
